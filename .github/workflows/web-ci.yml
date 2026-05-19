@@ -1,4 +1,3 @@
-# CI do app Next.js em `web/`: testes unitários (Vitest) + integração (Postgres).
 name: Web CI
 
 on:
@@ -8,13 +7,11 @@ on:
       - "web/**"
       - ".github/workflows/web-ci.yml"
   pull_request:
+    branches: [main, master]
     paths:
       - "web/**"
       - ".github/workflows/web-ci.yml"
-
-defaults:
-  run:
-    working-directory: web
+  workflow_dispatch:
 
 jobs:
   test:
@@ -30,33 +27,37 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d hub_pareceres_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
+          --health-cmd="pg_isready -U postgres -d hub_pareceres_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    defaults:
+      run:
+        working-directory: web
 
     env:
       INTEGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hub_pareceres_test
 
     steps:
-      - name: Checkout
+      - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
+      - name: Instalar dependências
         run: npm ci
 
-      - name: Generate Prisma Client
+      - name: Gerar Prisma Client
         run: npx prisma generate
 
-      - name: Unit tests
+      - name: Rodar testes unitários
         run: npm test
 
-      - name: Integration tests (runImportacaoCsv)
+      - name: Rodar testes de integração
         run: npm run test:integration
