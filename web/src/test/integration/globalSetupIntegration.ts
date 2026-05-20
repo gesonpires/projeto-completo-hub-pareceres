@@ -13,7 +13,7 @@ export default async function globalSetupIntegration() {
     return;
   }
 
-  execSync("npx prisma db push --skip-generate", {
+  execSync("npx prisma db push", {
     cwd: webRoot,
     env: { ...process.env, DATABASE_URL: url },
     stdio: "inherit",
