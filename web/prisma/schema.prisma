@@ -1,0 +1,430 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PerfilNome {
+  ADMIN
+  OPERADOR_DADOS
+  ANALISTA
+  LEITOR
+}
+
+enum ImportacaoStatus {
+  CRIADO
+  VALIDADO
+  IMPORTADO
+  COM_PENDENCIAS
+  FALHOU
+}
+
+enum AuditoriaAcao {
+  CREATE
+  UPDATE
+  DELETE
+  RESTORE
+}
+
+enum InstituicaoSituacao {
+  ATIVA
+  INATIVA
+  EM_ANALISE
+}
+
+enum ProcessoStatus {
+  ABERTO
+  EM_TRAMITACAO
+  CONCLUIDO
+  ARQUIVADO
+}
+
+enum ProcessoTipo {
+  CREDENCIAMENTO
+  AUTORIZACAO
+  RENOVACAO
+  OUTRO
+}
+
+enum TipoDocumentoCodigo {
+  OFICIO
+  PARECER
+  RESOLUCAO
+  OUTRO
+}
+
+enum FonteDadosTipo {
+  ARQWORD
+  XLSX
+  CSV
+  GSHEET
+  OUTRO
+}
+
+enum ExportJobStatus {
+  PENDING
+  RUNNING
+  DONE
+  ERROR
+}
+
+enum AuditExportFormat {
+  CSV
+  JSON
+}
+
+enum AtoTipo {
+  PARECER
+  RESOLUCAO
+  PORTARIA
+  OUTRO
+}
+
+enum EventoTipo {
+  PROTOCOLO
+  DILIGENCIA
+  REUNIAO
+  DECISAO
+  OUTRO
+}
+
+enum TramitacaoStatus {
+  ENCAMINHADO
+  RECEBIDO
+  DEVOLVIDO
+  OUTRO
+}
+
+model Perfil {
+  id        String     @id @default(uuid()) @db.Uuid
+  nome      PerfilNome @unique
+  descricao String?
+
+  usuarios Usuario[]
+}
+
+model Usuario {
+  id           String  @id @default(uuid()) @db.Uuid
+  nome         String
+  email        String  @unique
+  passwordHash String?
+  ativo        Boolean @default(true)
+  perfilId     String  @db.Uuid
+  perfil       Perfil  @relation(fields: [perfilId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logsAuditoria LogAuditoria[]   @relation("AuditoriaActor")
+  importacoes   ImportacaoLote[] @relation("ImportacaoCriador")
+  auditoriaExports AuditoriaExportJob[]
+}
+
+model Comissao {
+  id        String  @id @default(uuid()) @db.Uuid
+  nome      String  @unique
+  descricao String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model Mantenedora {
+  id              String  @id @default(uuid()) @db.Uuid
+  razaoSocial     String
+  nomeFantasia    String?
+  cnpj            String? @unique
+  nomeNormalizado String
+  observacoes     String?
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  instituicoes Instituicao[]
+
+  @@index([nomeNormalizado])
+}
+
+model Instituicao {
+  id              String               @id @default(uuid()) @db.Uuid
+  nome            String
+  nomeNormalizado String
+  cnpj            String?              @unique
+  municipio       String?
+  uf              String?
+  situacao        InstituicaoSituacao?
+  endereco        String?
+
+  mantenedoraId String?      @db.Uuid
+  mantenedora   Mantenedora? @relation(fields: [mantenedoraId], references: [id])
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  processos  Processo[]
+  documentos Documento[]
+  atos       AtoAutorizativo[]
+  eventos    EventoRegulatorio[]
+
+  @@index([nomeNormalizado])
+  @@index([municipio])
+  @@index([uf])
+}
+
+model Processo {
+  id            String      @id @default(uuid()) @db.Uuid
+  instituicaoId String      @db.Uuid
+  instituicao   Instituicao @relation(fields: [instituicaoId], references: [id])
+
+  numero        String?
+  ano           Int?
+  tipo          ProcessoTipo?
+  status        ProcessoStatus @default(ABERTO)
+  dataAbertura  DateTime?      @db.Date
+  dataConclusao DateTime?      @db.Date
+  assunto       String?
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  documentos  Documento[]
+  atos        AtoAutorizativo[]
+  eventos     EventoRegulatorio[]
+  tramitacoes Tramitacao[]
+
+  @@index([instituicaoId, status])
+  @@index([numero])
+  @@index([ano])
+}
+
+model TipoDocumento {
+  id     String              @id @default(uuid()) @db.Uuid
+  codigo TipoDocumentoCodigo @unique
+  nome   String
+
+  documentos Documento[]
+}
+
+model Documento {
+  id              String        @id @default(uuid()) @db.Uuid
+  tipoDocumentoId String        @db.Uuid
+  tipoDocumento   TipoDocumento @relation(fields: [tipoDocumentoId], references: [id])
+
+  instituicaoId String?      @db.Uuid
+  instituicao   Instituicao? @relation(fields: [instituicaoId], references: [id])
+
+  processoId String?   @db.Uuid
+  processo   Processo? @relation(fields: [processoId], references: [id])
+
+  atoId String?         @db.Uuid
+  ato   AtoAutorizativo? @relation(fields: [atoId], references: [id])
+
+  eventoId String?          @db.Uuid
+  evento   EventoRegulatorio? @relation(fields: [eventoId], references: [id])
+
+  titulo        String
+  dataDocumento DateTime? @db.Date
+
+  arquivoNome    String?
+  arquivoMime    String?
+  arquivoTamanho Int?
+  storagePath    String?
+  textoExtraido  String?
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  @@index([instituicaoId, dataDocumento])
+  @@index([processoId, dataDocumento])
+  @@index([atoId, dataDocumento])
+  @@index([eventoId, dataDocumento])
+}
+
+model AtoAutorizativo {
+  id            String      @id @default(uuid()) @db.Uuid
+  instituicaoId String      @db.Uuid
+  instituicao   Instituicao @relation(fields: [instituicaoId], references: [id])
+
+  processoId String?   @db.Uuid
+  processo   Processo? @relation(fields: [processoId], references: [id])
+
+  tipo      AtoTipo
+  numero    String?
+  dataAto   DateTime @db.Date
+  ementa    String?
+  descricao String?
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  documentos Documento[]
+
+  @@index([instituicaoId, dataAto])
+}
+
+model EventoRegulatorio {
+  id            String      @id @default(uuid()) @db.Uuid
+  instituicaoId String      @db.Uuid
+  instituicao   Instituicao @relation(fields: [instituicaoId], references: [id])
+
+  processoId String?   @db.Uuid
+  processo   Processo? @relation(fields: [processoId], references: [id])
+
+  tipo       EventoTipo
+  dataEvento DateTime   @db.Date
+  descricao  String
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  documentos Documento[]
+
+  @@index([instituicaoId, dataEvento])
+}
+
+model Tramitacao {
+  id            String            @id @default(uuid()) @db.Uuid
+  processoId    String            @db.Uuid
+  processo      Processo          @relation(fields: [processoId], references: [id])
+  dataMovimento DateTime          @db.Date
+  deSetor       String?
+  paraSetor     String?
+  status        TramitacaoStatus?
+  observacao    String?
+
+  fonteDadosId     String? @db.Uuid
+  importacaoLoteId String? @db.Uuid
+  sourceRef        String?
+
+  createdAt DateTime  @default(now())
+  createdBy String?   @db.Uuid
+  updatedAt DateTime  @updatedAt
+  updatedBy String?   @db.Uuid
+  deletedAt DateTime?
+
+  @@index([processoId, dataMovimento])
+}
+
+model FonteDados {
+  id        String         @id @default(uuid()) @db.Uuid
+  nome      String         @unique
+  tipo      FonteDadosTipo
+  descricao String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  importacoes ImportacaoLote[]
+}
+
+model ImportacaoLote {
+  id           String     @id @default(uuid()) @db.Uuid
+  fonteDadosId String     @db.Uuid
+  fonteDados   FonteDados @relation(fields: [fonteDadosId], references: [id])
+
+  arquivoNome String
+  arquivoHash String?
+  arquivoTipo FonteDadosTipo @default(CSV)
+  arquivoMeta Json?
+  status      ImportacaoStatus @default(CRIADO)
+
+  contagemLidas      Int @default(0)
+  contagemImportadas Int @default(0)
+  contagemRejeitadas Int @default(0)
+
+  relatorioErros   Json?
+  reconciliacoes   Json?
+  relatorioImpacto Json?
+
+  criadoPor String  @db.Uuid
+  criador   Usuario @relation("ImportacaoCriador", fields: [criadoPor], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime? @updatedAt
+}
+
+model LogAuditoria {
+  id         String        @id @default(uuid()) @db.Uuid
+  entidade   String
+  entidadeId String        @db.Uuid
+  acao       AuditoriaAcao
+
+  actorUserId String  @db.Uuid
+  actor       Usuario @relation("AuditoriaActor", fields: [actorUserId], references: [id])
+
+  timestamp DateTime @default(now())
+  antes     Json?
+  depois    Json?
+  metadata  Json?
+
+  @@index([entidade, entidadeId])
+  @@index([actorUserId, timestamp])
+}
+
+model AuditoriaExportJob {
+  id        String          @id @default(uuid()) @db.Uuid
+  status    ExportJobStatus @default(PENDING)
+  format    AuditExportFormat @default(CSV)
+  filtros   Json?
+  limit     Int             @default(10000)
+
+  arquivoPath String?
+  error      String?
+
+  criadoPor String  @db.Uuid
+  criador   Usuario @relation(fields: [criadoPor], references: [id])
+
+  createdAt  DateTime @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([criadoPor, createdAt])
+}

@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16
+    container_name: hub-pareceres-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hub_pareceres
+    ports:
+      - "5432:5432"
+    volumes:
+      - hub_pareceres_pgdata:/var/lib/postgresql/data
+
+  # Banco opcional para `npm run test:integration` (porta 5433 evita conflito com `db`).
+  db_test:
+    image: postgres:16
+    container_name: hub-pareceres-db-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hub_pareceres_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - hub_pareceres_pgdata_test:/var/lib/postgresql/data
+
+volumes:
+  hub_pareceres_pgdata:
+  hub_pareceres_pgdata_test:
